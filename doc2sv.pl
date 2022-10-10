@@ -424,8 +424,8 @@ foreach ( keys %reg_sub_f ) {
    print "Found pure software scratch register, $f_name\n";
   } else {
    $out_port_lst .= " R_".uc($f_name).",\n";
-   if( $width >  1 ) {
-    if( $width >= 10 ) {
+   if( $width > 1 ) {
+    if( $width > 9 ) {
      $out_port_dir .= " output logic [$widt1:0] R_".uc($f_name).",\n";
     } else {
      $out_port_dir .= " output logic  [$widt1:0] R_".uc($f_name).",\n";
@@ -546,7 +546,7 @@ foreach ( keys %reg_sub_f ) {
 
 my $rd_out_mux;
 $rd_out_mux  = "reg  [$rddt_wid:0] rd_out;\n";
-$rd_out_mux .= "always_comb @(*)\n";
+$rd_out_mux .= "always_comb\n";
 $rd_out_mux .= " case ($addr_bus_name)\n";
 
 
@@ -562,8 +562,7 @@ foreach ( keys %rego_hsh ) {
  my $len = length($n_reg);
  my $spc = blank_spc($reg_n_len - $len);
 
- $rd_out_mux .= "  p".$n_reg."$spc: rd_out = ".$rd_out_w{$n_reg}.";\n";
-#$rd_out_mux .= "  p".$n_reg;
+ $rd_out_mux .= "  p".uc($n_reg)."$spc: rd_out = ".$rd_out_w{$n_reg}.";\n";
 }
 
  my $spc = blank_spc($reg_n_len - 6);
@@ -615,16 +614,16 @@ foreach ( keys %reg_sub_f ) {
   my $width = $msb - $lsb + 1;;
   my $widt1 = $width - 1;;
 
+# if( $width > 1 ) {
+#  if( $width > 9 ) {
+#   $comb  .= "reg [".$widt1.":0] R_".uc($xx->[3]).";\n";
+#  } else {
+#   $comb  .= "reg  [".$widt1.":0] R_".uc($xx->[3]).";\n";
+#  }
+# } else {
+#  $comb  .= "reg        R_".uc($xx->[3]).";\n";
+# }
 
-  if( $width > 1 ) {
-   if( $width > 9 ) {
-    $comb  .= "reg [".$widt1.":0] R_".uc($xx->[3]).";\n";
-   } else {
-    $comb  .= "reg  [".$widt1.":0] R_".uc($xx->[3]).";\n";
-   }
-  } else {
-   $comb  .= "reg        R_".uc($xx->[3]).";\n";
-  }
  }
 
 
@@ -947,7 +946,7 @@ if( $tmp >= 10 ) {
 }
 
 $tmp = $rddt_bus_widt-1;
-if( $tmp >= 10 ) {
+if( $tmp > 9 ) {
  $port_dir_dec .= " output logic [$tmp:0] $rddt_bus_name,\n";
 } else {  
  $port_dir_dec .= " output logic  [$tmp:0] $rddt_bus_name,\n";
@@ -1023,7 +1022,7 @@ if( $rd_ctrl_polr eq "HIGH" ) {
 
 if( $rd_delay == 1 ) {
  my $comb;
- print OUT_V "\nreg [$tmp:0] $rddt_bus_name;\n";
+#print OUT_V "\nreg [$tmp:0] $rddt_bus_name;\n";
  print OUT_V $clk_rst;
  if( $rst_polr eq "POS" ) {
   $comb = " if(  $rst_name )\n";
