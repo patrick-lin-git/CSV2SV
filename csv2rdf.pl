@@ -59,6 +59,8 @@ my $cur_fbs = 0;     # field base
 
 my $data_bus_width = 0;
 
+my $loop_en;
+
 while (<FH>) {
  my $line = $_;
  my @fld_ary;
@@ -74,7 +76,7 @@ while (<FH>) {
    $data_bus_width = $data_bus[2];
  }
  
- if( $line =~ /^\"LOOP/ ) {
+ if( $line =~ /^LOOP/ ) {
   $lp_cont = $fld_ary[1]; 
   $lp_base = $fld_ary[2]; 
   $lp_incr = $fld_ary[3]; 
@@ -94,12 +96,14 @@ while (<FH>) {
   $out_str .= ":: for my \$idx (\@lp_range) {\n";
 
   $f1st_lp = 0;
+  $loop_en = 1;
   next;
  }
 
- if( $line =~ /^\"ENDLOOP/ ) {
+ if( $line =~ /^ENDLOOP/ ) {
   $out_str .= "::  \$"."$lp_varb += $lp_incr;\n";
   $out_str .= ":: }\n";
+  $loop_en = 0;
   next;
  }
 
@@ -203,9 +207,16 @@ sub ary2str {
  my @ary = @_;
  my $str = "";
  foreach my $cel (@ary) {
+
   if( $cel =~ /[,|\s]/ ) {
    $cel = "\"".$cel."\"";
   }
+
+  if( $cel =~ /<\S+>/ ) {
+   $cel =~ s/</'\$/g;
+   $cel =~ s/>/'/g;
+  }
+
   $str .= "$cel,";
  }
  $str =~ s/,$//;

@@ -2,7 +2,7 @@
 
 
 if [ $# -lt 1 ]; then
- echo "No source .csv file!"
+ echo "No source *.csv file!"
  echo "Example:"
  echo " csv2sv in.csv"
  exit 1
@@ -48,7 +48,12 @@ echo ""
 echo "PPP     processing.."
 ppp $file.rdf.src > $file.rdf
 
-echo "File $file.rdf generated"
+if [ -s $file.rdf ]; then
+ echo "File $file.rdf generated"
+else
+ echo "PPP     Failed"
+ exit 
+fi
 
 echo ""
 echo "DOC2SV  processing.."

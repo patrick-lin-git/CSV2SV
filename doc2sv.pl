@@ -141,7 +141,13 @@ while ($line = <IN_RDF>) {
      $rst_is_def == 1 &&
      $rdx_is_def == 1 ) {
   $all_define = 1;
-  print "RDF File: $ARGV[0] Pre-Integrity Check Pass!!\n";
+  if( $wrdt_bus_widt == $rddt_bus_widt ) {
+   print "RDF File: $ARGV[0] Pre-Integrity Check Pass!!\n";
+  } else {
+   print "RDF File: $ARGV[0] Read and Write Data Bus width mismatch!!\n";
+   print "RDF File: $ARGV[0] Read : $rddt_bus_widt\n";
+   print "RDF File: $ARGV[0] Write: $wrdt_bus_widt\n";
+  }
   last;
  }
 }   # while
