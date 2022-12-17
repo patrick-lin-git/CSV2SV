@@ -304,7 +304,7 @@ while ( $line = <IN_RDF> ) {
  chomp ( $line );
  $line = rm_dq($line);
 
- if( $line =~ /^[X|x]([\d|\w]+)\s*,([\w|\d]+),/ ) {
+ if( $line =~ /^[X|x]([\d|\w]+)\s*,([\w|\d]+),*/ ) {
 
   if( $f1st_scn == 1) {
    $offs = uc($1);
@@ -360,13 +360,18 @@ while ( $line = <IN_RDF> ) {
   
   my @sub_field = ($rang, $dflt, $atrb, $fldn, $opt1, $opt2);
 
-  if( exists $field_nam{$fldn} ) {
-   die "ERROR!! filed name $fldn has been defined before\n";
+  if( $atrb eq "FILLER" ) {
+   # skip this sub field
   } else {
-   $field_nam{$fldn}  = $rang;
+   if( exists $field_nam{$fldn} ) {
+    die "ERROR!! field name $fldn has been defined before\n";
+   } else {
+    $field_nam{$fldn}  = $rang;
+   }
+   push @all_sub_f, [ @sub_field ] ;
   }
 
-  push @all_sub_f, [ @sub_field ] ;
+# push @all_sub_f, [ @sub_field ] ;
 # push(@all_sub_f,  \@sub_field ) ;
 # push(@all_sub_f,   @sub_field ) ;
  }
@@ -484,7 +489,7 @@ my %rd_out_l = ();
 my $msb;
 my $width;
 foreach ( keys %reg_sub_f ) {
- my $reg_n = $_;
+ my $reg_n = lc($_);
  my $all_sub_fld = $reg_sub_f{$_};
  my $comb = "";
  foreach my $xx (@$all_sub_fld) {
@@ -540,10 +545,10 @@ foreach ( keys %reg_sub_f ) {
  
 #my $rd_out_name = lc($rego_hsh{$reg_n})."_rd"; 
 
-
  my $rd_out_name = $reg_n."_rd"; 
  $rd_out_w{$reg_n} = $rd_out_name;
  $rd_out_l{$reg_n} = "wire [$rddt_wid:0] $rd_out_name = { ".$comb." };\n";
+
 }
 
 # foreach ( keys %rego_hsh ) {
@@ -556,9 +561,10 @@ $rd_out_mux .= "always_comb\n";
 $rd_out_mux .= " case ($addr_bus_name)\n";
 
 
-# foreach ( keys %rd_out_w ) {
-#  print "=== $_ $rd_out_w{$_} ===\n"; 
-# }
+# dump all rd_out_w
+foreach ( keys %rd_out_w ) {
+ print "=== $_ $rd_out_w{$_} ===\n"; 
+}
 
 
 foreach ( keys %rego_hsh ) {
@@ -568,6 +574,9 @@ foreach ( keys %rego_hsh ) {
  my $len = length($n_reg);
  my $spc = blank_spc($reg_n_len - $len);
 
+ if( $rd_out_w{$n_reg} eq "" ) {
+  print "$n_reg\n"
+ }
  $rd_out_mux .= "  p".uc($n_reg)."$spc: rd_out = ".$rd_out_w{$n_reg}.";\n";
 }
 
