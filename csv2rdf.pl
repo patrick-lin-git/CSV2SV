@@ -4,7 +4,8 @@ use strict;
 use warnings;
 use Text::CSV;
 
-my $csv = Text::CSV->new({ sep_char => ',' });
+# my $csv = Text::CSV->new({ quote_char => "\"", sep_char => "," });
+  my $csv = Text::CSV->new({ sep_char => "," });
 
 
 
@@ -152,11 +153,13 @@ while (<FH>) {
   my $str = ary2str(@fld_ary);
 
   $line = ",$rag_str,". $str."\n";
-  $cur_fbs += $wid;
+# $cur_fbs += $wid;
 
-  if( $cur_fbs >= $data_bus_width ) {
-   die "Bit offset $cur_fbs within the register is out of range: $data_bus_width\n";
+# if( $cur_fbs >= $data_bus_width ) {
+  if( $msb     >= $data_bus_width ) {
+   die "Bit offset $msb for field width $wid within the register is out of bus width range: $data_bus_width\n";
   }
+  $cur_fbs += $wid;
  }
 
  if( $line =~ /^\"\/\// ) {

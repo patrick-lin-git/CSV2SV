@@ -256,7 +256,8 @@ foreach ( keys %rego_hsh ) {
  my $str = $rego_hsh{$_};
  my $len = length($str);
  my $spc = blank_spc($reg_n_len - $len);
-
+ 
+ chk_ofst_width  ($ofs);
  $ofs = get_ofst ($ofs);
  
  $adr_par_str .= "p".uc($rego_hsh{$_}).$spc." = ".$addr_bus_widt."'h".$ofs.",\n";
@@ -431,18 +432,32 @@ foreach ( keys %reg_sub_f ) {
 # print "== $attrb  ==\n";
 # print "== $f_name ==\n";
 
+  # port direction
+  my $prtdir = "";
+  my $hdr_nm = "";
+  if( $attrb =~ /RO/ ) {
+   $prtdir = "input ";
+   $hdr_nm = "I_";
+  } else {
+   $prtdir = "output";
+   $hdr_nm = "R_";
+  }
+
   if( $attrb =~ /X/ ) {
    print "Found pure software scratch register, $f_name\n";
   } else {
+
+   my $name_head = "R_";
+
    $out_port_lst .= " R_".uc($f_name).",\n";
    if( $width > 1 ) {
     if( $width > 9 ) {
-     $out_port_dir .= " output logic [$widt1:0] R_".uc($f_name).",\n";
+     $out_port_dir .= " $prtdir logic [$widt1:0] $hdr_nm".uc($f_name).",\n";
     } else {
-     $out_port_dir .= " output logic  [$widt1:0] R_".uc($f_name).",\n";
+     $out_port_dir .= " $prtdir logic  [$widt1:0] $hdr_nm".uc($f_name).",\n";
     }
    } else {
-    $out_port_dir .= " output logic        R_".uc($f_name).",\n";
+    $out_port_dir .= " $prtdir logic        $hdr_nm".uc($f_name).",\n";
    }
 
    if( $attrb =~ /C/ ) {
@@ -487,6 +502,7 @@ my %rd_out   = ();
 my %rd_out_w = ();
 my %rd_out_l = ();
 my $msb;
+my $msb_pre = 0;
 my $width;
 foreach ( keys %reg_sub_f ) {
  my $reg_n = lc($_);
@@ -501,8 +517,8 @@ foreach ( keys %reg_sub_f ) {
      $width = $msb - $lsb + 1;;
   my $widt1 = $width - 1;;
 
-  if( $lsb > ($msb + 1) ) {
-   $width = $lsb - $msb - 1;
+  if( $lsb  >= ($msb_pre + 2) ) {
+   $width = $lsb - $msb_pre - 1;
    if( $width > 1 ) {
     if( $width > 4 ) {
      $comb = $width."'h00"." ,".$comb;
@@ -514,19 +530,24 @@ foreach ( keys %reg_sub_f ) {
    }
   }
 
-  if( $attrb =~ /R/ ) {
-   $comb = "R_".uc($xx->[3])." ,".$comb;
-  } else {                                 # not readable
-   if($width > 1) {
-    if($width > 4) {
-     $comb = "$width"."'h00"." ,".$comb;
+  if( $attrb =~ /RO/ ) {
+    $comb = "r_".lc($xx->[3])." ,".$comb;
+  } else {
+   if( $attrb =~ /R/ ) {
+    $comb = "R_".uc($xx->[3])." ,".$comb;
+   } else {                                 # not readable
+    if($width > 1) {
+     if($width > 4) {
+      $comb = "$width"."'h00"." ,".$comb;
+     } else {
+      $comb = "$width"."'h0"." ,".$comb;
+     }
     } else {
-     $comb = "$width"."'h0"." ,".$comb;
+     $comb = "$width"."'b0"." ,".$comb;
     }
-   } else {
-    $comb = "$width"."'b0"." ,".$comb;
    }
   }
+  $msb_pre = $msb;
  }
 
  if( ($rddt_bus_widt-1) > $msb ) {
@@ -562,9 +583,9 @@ $rd_out_mux .= " case ($addr_bus_name)\n";
 
 
 # dump all rd_out_w
-foreach ( keys %rd_out_w ) {
- print "=== $_ $rd_out_w{$_} ===\n"; 
-}
+# foreach ( keys %rd_out_w ) {
+#  print "=== $_ $rd_out_w{$_} ===\n"; 
+# }
 
 
 foreach ( keys %rego_hsh ) {
@@ -592,7 +613,7 @@ $rd_out_mux .= " endcase\n";
 
 
 # ------------------------------------------------------------
-# write logic
+# register update logic
 
 my $clk_rst;
 
@@ -619,26 +640,19 @@ foreach ( keys %reg_sub_f ) {
  my $comb = "";
  my $lsb;
 
- # register decalation
+ my $sw_wr_reg_num = 0;
+ my $sw_ro_reg_num = 0;
  foreach my $xx ( @$all_sub_fld ) {
   my $range = $xx->[0];
-
-  my @ranga = split(':', $range);
-  my $msb   = $ranga[0];
-     $lsb   = $ranga[1];
-  my $width = $msb - $lsb + 1;;
-  my $widt1 = $width - 1;;
-
-# if( $width > 1 ) {
-#  if( $width > 9 ) {
-#   $comb  .= "reg [".$widt1.":0] R_".uc($xx->[3]).";\n";
-#  } else {
-#   $comb  .= "reg  [".$widt1.":0] R_".uc($xx->[3]).";\n";
-#  }
-# } else {
-#  $comb  .= "reg        R_".uc($xx->[3]).";\n";
-# }
-
+  my $attrb = $xx->[2];
+  my $rf_nam = lc($xx->[3]);
+  if( $attrb =~ /W/ || $attrb =~ /T/ || $attrb =~ /1/ || $attrb =~ /0/ || $attrb =~ /X/ ) {
+   $sw_wr_reg_num += 1;
+  }
+  if( $attrb =~ /RO/ ) {
+   $sw_ro_reg_num += 1;
+   $comb .= "logic \[$range\]  r_".$rf_nam.";\n"; 
+  }
  }
 
 
@@ -650,67 +664,88 @@ foreach ( keys %reg_sub_f ) {
   $comb .= " if( ~$rst_name )";
  }
 
+ # more than 1 registers
  if( @$all_sub_fld > 1 ) {
   $comb .= " begin\n";
-  foreach my $xx ( @$all_sub_fld ) {
-   my $attrb = $xx->[2];
+ } else {
+  $comb .= "\n";
+ }
 
-   my $range = $xx->[0];
-   my @ranga = split(':', $range);
-   my $msb   = $ranga[0];
-   my $lsb   = $ranga[1];
-   my $width = $msb - $lsb + 1;;
+ foreach my $xx ( @$all_sub_fld ) {
+  my $attrb = $xx->[2];
+  my $range = $xx->[0];
+  my @ranga = split(':', $range);
+  my $msb   = $ranga[0];
+  my $lsb   = $ranga[1];
+  my $width = $msb - $lsb + 1;;
 
 
-   # if( $attrb =~ /W/ ) {
-   my $reg_name = uc($xx->[3]);
-#  my $field_wd = $xx->[0] - $xx->[1] + 1;
-   if( ($width < 5) && (length($xx->[1]) > 1) ) {
-    print "ERR! Reg: ".$reg_name." Reset Default Out of Range:".$xx->[1]."\n";
+  # if( $attrb =~ /W/ ) {
+  my $rf_nam = uc($xx->[3]);
+  my $rf_nal = lc($xx->[3]);
+  if( ($width < 5) && (length($xx->[1]) > 1) ) {
+    print "ERR! Reg: ".$rf_nam." Reset Default Out of Range:".$xx->[1]."\n";
     die;
-   }
-   if( ($width > 4) && (length($xx->[1]) < 2) ) {
-    print "ERR! Reg: ".$reg_name." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
+  }
+  if( ($width > 4) && (length($xx->[1]) < 2) ) {
+    print "ERR! Reg: ".$rf_nam." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
     die;
-   }
-   if( ($width > 8) && (length($xx->[1]) < 3) ) {
-    print "ERR! Reg: ".$reg_name." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
+  }
+  if( ($width > 8) && (length($xx->[1]) < 3) ) {
+    print "ERR! Reg: ".$rf_nam." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
     die;
-   }
-   if( ($width >12) && (length($xx->[1]) < 4) ) {
-    print "ERR! Reg: ".$reg_name." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
+  }
+  if( ($width >12) && (length($xx->[1]) < 4) ) {
+    print "ERR! Reg: ".$rf_nam." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
     die;
-   }
-   if( ($width >16) && (length($xx->[1]) < 5) ) {
-    print "ERR! Reg: ".$reg_name." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
+  }
+  if( ($width >16) && (length($xx->[1]) < 5) ) {
+    print "ERR! Reg: ".$rf_nam." field width is $width but High bit of Reset Default not defined:".$xx->[1],"\n";
     die;
-   }
-   $comb .= "  R_".$reg_name." <= ".$width."'h".$xx->[1].";\n";
-   # }
   }
 
-  $comb .= "  end\n else begin\n";
-
-  if( $wr_ctrl_polr eq "HIGH" ) {
-   $comb .= "  if ( $reg_hit & $wr_ctrl_name ) begin\n";
+  if( $attrb =~ /RO/ ) {
+   $comb .= "  r_".$rf_nal." <= ".$width."'h".$xx->[1].";\n";
   } else {
-   $comb .= "  if ( $reg_hit & ~".$wr_ctrl_name." ) begin\n";
+   $comb .= "  R_".$rf_nam." <= ".$width."'h".$xx->[1].";\n";
+  }
+ }  # foreach
+
+ if( @$all_sub_fld > 1 ) {
+   $comb .= "  end\n else begin\n";
+ } else {
+   $comb .= " else\n";
+ }
+ # all register reset logic done
+
+
+ # all software write related logic
+ if( $sw_wr_reg_num > 0 ) {
+  if( $wr_ctrl_polr eq "HIGH" ) {
+   $comb .= "  if( $reg_hit & $wr_ctrl_name )";
+  } else {
+   $comb .= "  if( $reg_hit & ~".$wr_ctrl_name." )";
   }
 
+  if( $sw_wr_reg_num > 1 ) {
+   $comb .= " begin\n";
+  } else {
+   $comb .= "\n";
+  }
+  
   foreach my $xx ( @$all_sub_fld ) {
+   my $rang  = $xx->[0];
    my $attrb = $xx->[2];
    my $reg_n = uc($xx->[3]);
+   my $lsb   = get_lsb($rang);
+   my $width = get_width($rang);
 
    if( ($attrb =~ /T/) and ($attrb =~ /W/) ) {
     print "ERR! Reg: ".$reg_n." has field attribute: $attrb both W and T specified\n";
    }
 
+   #-------------------
    if( $attrb =~ /W/ ) {
-    my $rang = $xx->[0];
-  # print "= $rang =\n";
-  # my $width = get_width($xx->[0]);
-    my $width = get_width($rang);
-    my $lsb   = get_lsb  ($rang);
     if( $width > 1 ) {
      $comb .= "   R_".$reg_n." <= ".$wrdt_bus_name."[".$xx->[0]."];\n";
     } else {
@@ -718,190 +753,130 @@ foreach ( keys %reg_sub_f ) {
     }
    }
 
+   #-------------------
    if( $attrb =~ /T/ ) {
-    my $rang = $xx->[0];
-  # print "= $rang =\n";
-  # my $width = get_width($xx->[0]);
-    my $width = get_width($rang);
     if( $width > 1 ) {
      print "ERR! Reg: ".$reg_n." field width $width is greater than 1 with T attribute specified:".$attrb,"\n";
+     die;
     }
-    my $lsb   = get_lsb($rang);
 
 #   $comb .= "   if( R_".$reg_n." )\n";
 #   $comb .= "    R_".$reg_n." <= 1'b0;\n";
 #   $comb .= "   else\n";
     $comb .= "   R_".$reg_n." <= ~R_".$reg_n." & ".$wrdt_bus_name."[  $lsb"."];\n";
    }
-  }
-
-  $comb .= "  end\n";
-
-  foreach my $xx ( @$all_sub_fld ) {
-   my $attrb = $xx->[2];
-   my $reg_n = uc($xx->[3]);
-#  my $rang = $xx->[0];
-#  my $lsb  = get_lsb  ($rang);
-   if( $attrb =~ /T/ ) {
-
-    $comb .= "\n";
-    $comb .= "  if( R_".$reg_n." )\n";
-    $comb .= "   R_".$reg_n." <= 1'b0;\n\n";
-#   $comb .= "  else\n";
-#   $comb .= "   R_".$reg_n." <= ".$wrdt_bus_name."[  $lsb"."];\n";
-   }
-  }
-
-
-  foreach my $xx ( @$all_sub_fld ) {
-   my $attrb =  $xx->[2];
-   my $reg_n = uc($xx->[3]);
-   if( $attrb =~ /C/ ) {              # hardware clear
-    $comb .= "  if ( H_CLR_".$reg_n." )\n";
-
-    my $field_wd = get_width($xx->[0]);
-
-    if( $field_wd > 1 ) {
-     print "ERR! $reg_n Field width > 1, Hardware Clr is not allowed\n";
-     die;
-    } else {
-     $comb .= "   R_".$reg_n." <= 1"."'b0;\n";
-    }
-   }
-  }
-
-  foreach my $xx ( @$all_sub_fld ) {
-   my $attrb = $xx->[2];
-   my $reg_n = uc($xx->[3]);
-   if( $attrb =~ /S/ ) {              # hardware clear
-    $comb .= "  if ( H_SET_".$reg_n." )\n";
-    my $field_wd = get_width($xx->[0]);
-    if( $field_wd > 1 ) {
-     print "ERR! $reg_n Field width > 1, Hardware Set is not allowed\n";
-     die;
-    } else {
-     $comb .= "   R_".$reg_n." <= 1"."'b1;\n";
-    }
-   }
-  }
-
-  foreach my $xx ( @$all_sub_fld ) {
-   my $range = $xx->[0];
-   my @ranga = split(':', $range);
-   my $msb   = $ranga[0];
-   my $lsb   = $ranga[1];
-   my $width = $msb - $lsb + 1;
-   my $widt1 = $width - 1;;
-
-   my $attrb = $xx->[2];
-   my $reg_n = uc($xx->[3]);
 
    if( $attrb =~ /1/ ) {              # write 1 clear
-
-    if( $wr_ctrl_polr eq "HIGH" ) {
-     $comb .= "  if ( $reg_hit & $wr_ctrl_name & $wrdt_bus_name"."[  $lsb]"."])\n";
-    } else {
-     $comb .= "  if ( $reg_hit & ~"."$wr_ctrl_name & $wrdt_bus_name"."[  $lsb]"."])\n";
-    }
-
+    $comb .= "   if ( $wrdt_bus_name"."[  $lsb]"."])\n";
     if( $width > 1 ) {
      print "ERR! Field width > 1, Write 1 clear is not allowed\n";
      die;
     } else {
-     $comb .= "   R_".$reg_n." <= ".$width."'b0;\n";
+     $comb .= "    R_".$reg_n." <= ".$width."'b0;\n";
+    }
+   }
+
+   if( $attrb =~ /0/ ) {              # write 1 clear
+    $comb .= "   if ( ~$wrdt_bus_name"."[  $lsb]"."])\n";
+    if( $width > 1 ) {
+     print "ERR! Field width > 1, Write 1 clear is not allowed\n";
+     die;
+    } else {
+     $comb .= "    R_".$reg_n." <= ".$width."'b1;\n";
     }
    }
   }
 
-  $comb .= " end\n\n";
- } else { # only one register
-  my $attrb;
-  my $reg_n;
-  my $f_wid;
-# print "== $attrb $reg_n $f_wid == \n";
-  foreach my $xx ( @$all_sub_fld ) {
-   $attrb = $xx->[2];
-   $reg_n = uc($xx->[3]);
-   $f_wid = get_width($xx->[0]);
-   if( $attrb =~ /W/ ) {
-    if( ($f_wid < 5) && (length($xx->[1]) > 1) ) {
-     print "ERR! Reg: ".$reg_n." Reset Default Out of Range:".$xx->[1]."\n";
-     die;
-    }
-    if( ($f_wid > 4) && (length($xx->[1]) < 2) ) {
-     print "ERR! Reg: ".$reg_n." High bit of Reset Default not defined: ".$xx->[1]."\n";
-     die;
-    }
-    $comb .= "\n  R_".$reg_n." <= ".$f_wid."'h".$xx->[1].";\n";
-   }
-  }
-
-  
-  if( ($attrb =~ /C/) || ($attrb =~ /S/) ) {
-   $comb .= " else begin\n";
+  if( $sw_wr_reg_num > 1 ) {
+   $comb .= "   end\n";
   } else {
-   $comb .= " else\n";
+   $comb .="\n";
   }
-
-  if( $wr_ctrl_polr eq "HIGH" ) {
-   $comb .= "  if ( $reg_hit & $wr_ctrl_name )\n";
-  } else {
-   $comb .= "  if ( $reg_hit & ~".$wr_ctrl_name." )\n";
-  }
-
-  foreach my $xx ( @$all_sub_fld ) {
-   $attrb = $xx->[2];
-   $reg_n = uc($xx->[3]);
-   $f_wid = get_width($xx->[0]);
-   my $lsb = get_lsb($xx->[0]);
-   if( $attrb =~ /W/ ) {
-    if( $f_wid > 1 ) {
-     $comb .= "   R_".$reg_n." <= ".$wrdt_bus_name."[".$xx->[0]."];\n";
-    } else {
-     $comb .= "   R_".$reg_n." <= ".$wrdt_bus_name."[".$lsb."];\n";
-    }
-   }
-  }
-  $comb .= "\n";
-
-  foreach my $xx ( @$all_sub_fld ) {
-   $attrb = $xx->[2];
-   $f_wid = get_width($xx->[0]);
-   $reg_n = uc($xx->[3]);
-   if( $attrb =~ /C/ ) {
-    $comb .= "  if ( H_CLR_".$reg_n." )\n";
-    if( $f_wid > 1 ) {
-     print "ERR! $reg_n Field width > 1, Hardware Clr is not allowed\n";
-     die;
-    } else {
-     $comb .= "   R_".$reg_n." <= ".$f_wid."'b0;\n";
-    }
-   }
-  }
-
-  foreach my $xx ( @$all_sub_fld ) {
-   $attrb = $xx->[2];
-   $reg_n = uc($xx->[3]);
-   $f_wid = get_width($xx->[0]);
-   if( $attrb =~ /S/ ) {
-    $comb .= "  if ( H_SET_".$reg_n." )\n";
-    if( $f_wid > 1 ) {
-     print "ERR! $reg_n Field width > 1, Hardware Set is not allowed\n";
-     die;
-    } else {
-     $comb .= "   ".$reg_n." <= ".$f_wid."'b0;\n";
-    }
-   }
-  }
+  # all software write related logic
+ }
 
 
-  if( ($attrb =~ /C/) || ($attrb =~ /S/) ) {
-   $comb .= " end\n\n";
+ #-------------------------------------------------
+ foreach my $xx ( @$all_sub_fld ) {
+  my $attrb = $xx->[2];
+  my $reg_n = uc($xx->[3]);
+# my $rang = $xx->[0];
+# my $lsb  = get_lsb  ($rang);
+  if( $attrb =~ /T/ ) {
+
+   $comb .= "\n";
+   $comb .= "  if( R_".$reg_n." )\n";
+   $comb .= "   R_".$reg_n." <= 1'b0;\n\n";
+#  $comb .= "  else\n";
+#  $comb .= "   R_".$reg_n." <= ".$wrdt_bus_name."[  $lsb"."];\n";
   }
  }
+
+
+ foreach my $xx ( @$all_sub_fld ) {
+  my $attrb =  $xx->[2];
+  my $reg_n = uc($xx->[3]);
+  if( $attrb =~ /C/ ) {              # hardware clear
+   $comb .= "  if( H_CLR_".$reg_n." )\n";
+
+   my $field_wd = get_width($xx->[0]);
+
+   if( $field_wd > 1 ) {
+    print "ERR! $reg_n Field width > 1, Hardware Clr is not allowed\n";
+    die;
+   } else {
+    $comb .= "   R_".$reg_n." <= 1"."'b0;\n";
+   }
+  }
+ }
+
+ foreach my $xx ( @$all_sub_fld ) {
+  my $attrb = $xx->[2];
+  my $reg_n = uc($xx->[3]);
+  if( $attrb =~ /S/ ) {              # hardware set
+   $comb .= "  if ( H_SET_".$reg_n." )\n";
+   my $field_wd = get_width($xx->[0]);
+   if( $field_wd > 1 ) {
+    print "ERR! $reg_n Field width > 1, Hardware Set is not allowed\n";
+    die;
+   } else {
+    $comb .= "   R_".$reg_n." <= 1"."'b1;\n";
+   }
+  }
+ }
+
+ if( @$all_sub_fld > 1 ) {
+  $comb .= "\n";
+ }
+
+ if( $sw_ro_reg_num > 1 ) {
+  $comb .= " begin\n";
+ }
+
+ foreach my $xx ( @$all_sub_fld ) {
+  my $rf_nal = lc($xx->[3]);
+  my $rf_nau = uc($xx->[3]);
+  my $attrb = $xx->[2];
+  if( $attrb =~ /RO/ ) {              # hardware set
+   $comb .= "  r_".$rf_nal." <= I_".$rf_nau.";\n";
+  }
+ }
+
+ if( $sw_ro_reg_num > 1 ) {
+  $comb .= " end \n";
+ }
+
+ if( @$all_sub_fld > 1 ) {
+  $comb .= " end\n\n";
+ } else {
+  $comb .= "\n\n";
+ }
+
  # print $comb;
  $wr_logic{$_} = $comb;
-}
+
+} # all regist update logic
+
 
 # foreach ( keys %reg_sub_f ) {
 #  print $wr_logic{$_};
@@ -1230,6 +1205,7 @@ sub gen_zero {
 }
 
 
+# append '0' before value
 sub get_ofst {
  my $str = $_[0];
  my $len = length($str);
@@ -1254,6 +1230,44 @@ sub get_ofst {
  return $str;
 }
 
+
+# check offset value binary width
+sub chk_ofst_width {
+ my $str = $_[0];
+ my $val = hex($str);
+
+ if( ($val >=1024) && $addr_bus_widt <=10 ) {
+  die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+ } else {
+  if( ($val >= 512) && $addr_bus_widt <= 9 ) {
+   die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+  } else {
+   if( ($val >= 256) && $addr_bus_widt <= 8 ) {
+    die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+   } else {
+    if( ($val >= 128) && $addr_bus_widt <= 7 ) {
+     die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+    } else {
+     if( ($val >=  64) && $addr_bus_widt <= 6 ) {
+      die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+     } else {
+      if( ($val >=  32) && $addr_bus_widt <= 5 ) {
+       die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+      } else {
+       if( ($val >=  16) && $addr_bus_widt <= 4 ) {
+        die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+       } else {
+        if( ($val >=   8) && $addr_bus_widt <= 3 ) {
+         die "Error, Address Bus Width($addr_bus_widt) too small to accomdate all registers($val) ";
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}
 
 
 # remove any field start with ',"' and end with '",'
