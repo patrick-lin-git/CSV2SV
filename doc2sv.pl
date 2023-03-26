@@ -767,19 +767,19 @@ foreach ( keys %reg_sub_f ) {
    }
 
    if( $attrb =~ /1/ ) {              # write 1 clear
-    $comb .= "   if ( $wrdt_bus_name"."[  $lsb]"."])\n";
+    $comb .= "   if( $wrdt_bus_name"."[ $lsb"."] )\n";
     if( $width > 1 ) {
      print "ERR! Field width > 1, Write 1 clear is not allowed\n";
      die;
     } else {
-     $comb .= "    R_".$reg_n." <= ".$width."'b0;\n";
+     $comb .= "    R_".$reg_n." <= ".$width."'b0;\n\n";
     }
    }
 
-   if( $attrb =~ /0/ ) {              # write 1 clear
-    $comb .= "   if ( ~$wrdt_bus_name"."[  $lsb]"."])\n";
+   if( $attrb =~ /0/ ) {              # write 0 set
+    $comb .= "   if( ~$wrdt_bus_name"."[ $lsb"."] )\n";
     if( $width > 1 ) {
-     print "ERR! Field width > 1, Write 1 clear is not allowed\n";
+     print "ERR! Field width > 1, Write 0 set  is not allowed\n";
      die;
     } else {
      $comb .= "    R_".$reg_n." <= ".$width."'b1;\n";
@@ -812,7 +812,6 @@ foreach ( keys %reg_sub_f ) {
   }
  }
 
-
  foreach my $xx ( @$all_sub_fld ) {
   my $attrb =  $xx->[2];
   my $reg_n = uc($xx->[3]);
@@ -825,7 +824,7 @@ foreach ( keys %reg_sub_f ) {
     print "ERR! $reg_n Field width > 1, Hardware Clr is not allowed\n";
     die;
    } else {
-    $comb .= "   R_".$reg_n." <= 1"."'b0;\n";
+    $comb .= "   R_".$reg_n." <= 1"."'b0;\n\n";
    }
   }
  }
@@ -840,7 +839,7 @@ foreach ( keys %reg_sub_f ) {
     print "ERR! $reg_n Field width > 1, Hardware Set is not allowed\n";
     die;
    } else {
-    $comb .= "   R_".$reg_n." <= 1"."'b1;\n";
+    $comb .= "   R_".$reg_n." <= 1"."'b1;\n\n";
    }
   }
  }

@@ -9,47 +9,53 @@ if [ $# -lt 1 ]; then
 fi
 
 
-file=`basename $1 .csv`
+if [ ! -f $1 ]; then
+ echo "Input file $1 not found!"
+ exit 1
+fi
 
-# cp $1 /tmp/$file.csv
+
+file=`basename $1 | sed -e 's/\..*//'`
+
+cp $1 /tmp/tmp0
 # fix LibreOffice Calc CSV file single quite "'" translate issue
-cat $1 | tr -s "\342\200\231" "'" > /tmp/$file.csv
+# cat $1 | tr -s "\342\200\231" "'" > /tmp/$file.csv
 
 pushd /tmp > /dev/null
 
 # remove leading <"***> of line
-sed -e "s/^\"//"            $file.csv > tmp0
+# sed -e "s/^\"//"            $file.csv > tmp0
 
 # remove tail<",,,>, leave last "
-sed -e "s/\"[,]*$/\"/"      tmp0      > tmp1
+# sed -e "s/\"[,]*$/\"/"      tmp0      > tmp1
 
 # remove whole line ,,,,
-sed -e "s/^[,]*$//"         tmp1      > tmp2
+sed -e "s/^[,]*$//"           tmp0      > tmp1
 
 # remove leading //
-sed -ie "/^\/\//d"          tmp2
+sed -ie "/^\/\//d"            tmp1
 
-sed -ie "/CHIPSEL/s/\"//g"  tmp2
-sed -ie "/ADR_BUS/s/\"//g"  tmp2
-sed -ie "/RD_DATA/s/\"//g"  tmp2
-sed -ie "/WR_DATA/s/\"//g"  tmp2
-sed -ie "/WR_CTRL/s/\"//g"  tmp2
-sed -ie "/RD_CTRL/s/\"//g"  tmp2
-sed -ie "/CLK_SIG/s/\"//g"  tmp2
-sed -ie "/RST_SIG/s/\"//g"  tmp2
-sed -ie "/RDD_DLY/s/\"//g"  tmp2
+# sed -ie "/CHIPSEL/s/\"//g"  tmp2
+# sed -ie "/ADR_BUS/s/\"//g"  tmp2
+# sed -ie "/RD_DATA/s/\"//g"  tmp2
+# sed -ie "/WR_DATA/s/\"//g"  tmp2
+# sed -ie "/WR_CTRL/s/\"//g"  tmp2
+# sed -ie "/RD_CTRL/s/\"//g"  tmp2
+# sed -ie "/CLK_SIG/s/\"//g"  tmp2
+# sed -ie "/RST_SIG/s/\"//g"  tmp2
+# sed -ie "/RDD_DLY/s/\"//g"  tmp2
 
-sed -e "/^X/s/\"//g"       tmp2 > tmp3
-sed -e "/^LOOP/s/\"//g"    tmp3 > tmp4
-sed -e "/^ENDLOOP/s/\"//g" tmp4 > tmp5
+# sed -e "/^X/s/\"//g"       tmp2 > tmp3
+# sed -e "/^LOOP/s/\"//g"    tmp3 > tmp4
+# sed -e "/^ENDLOOP/s/\"//g" tmp4 > tmp5
 
 # remove all " in line begin with ," (first line of field definition)
 # sed -e "/^,\"/s/\"//g"     tmp5 > tmp6
 # sed -e "s/^,\"([\w]*)\",\"([\w]*)\",\"([\w]*)\",\"([\w]*)\",/,\1,\2,\3,/"     tmp5 > tmp6
-sed -e "s/\"\(\w*\)\"/\1/g"     tmp5 > tmp6
+# sed -e "s/\"\(\w*\)\"/\1/g"     tmp5 > tmp6
 
 # sed -e "/,,,,\"/s/$/\"/"   tmp6 > $file.csv.cook
-mv tmp6 $file.csv.cook
+mv tmp1 $file.csv.cook
 
 # back to invoke place
 popd > /dev/null
